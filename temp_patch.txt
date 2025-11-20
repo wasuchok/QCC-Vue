@@ -1,0 +1,16 @@
+*** Update File: src/views/RegisterQCC.vue
+@@
+ const managerCandidates = computed(() => {
+   const departmentCode = advisorDepartmentCode.value
+   if (!departmentCode) return []
+   const deptLower = departmentCode.toLowerCase()
+   const selectedTeamLower = normalizeString(state.s1_team).toLowerCase()
+   const seen = new Set()
+-  return users.value
++  return advisorSource.value
+     .filter(emp => {
+       if (!emp || !emp.codeLower) return false
+       const empDept = emp.deptCodeLower || emp.dept?.toLowerCase?.() || ''
+       if (empDept !== deptLower) return false
+       if (selectedTeamLower && emp.teamCodeLower && emp.teamCodeLower !== selectedTeamLower) return false
+*** End Patch
