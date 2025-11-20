@@ -253,6 +253,7 @@ const employeeLookupCache = new Map()
 let logoObjectUrl = ''
 let groupNoLocked = false
 let hasHydrated = false
+let departmentsReady = false
 
 function syncMemberRoles() {
   state.members.forEach((member, idx) => {
@@ -356,6 +357,10 @@ function hydrateForm() {
     if (state.logoDataUrl) {
       setLogoPreview(state.logoDataUrl)
     }
+    if (departmentsReady && state.s1_department) {
+      setTeamsForDepartment(false)
+      updateGroupTypeFromTeam()
+    }
   } catch (err) {
     console.warn('Hydrate register form failed:', err)
   } finally {
@@ -368,6 +373,13 @@ async function fetchDepartmets() {
   const records = response.data?.data || response.data || []
   departmentOptions.value = records
   teamOptions.value = []
+  departmentsReady = true
+  if (state.s1_department) {
+    setTeamsForDepartment(false)
+    updateGroupTypeFromTeam()
+    fetchPositionAdvisor()
+    fetchPositionManager()
+  }
 }
 
 async function fetchPositionAdvisor() {
@@ -424,12 +436,35 @@ async function fetchPositionManager() {
   managerCandidates.value = items
 }
 
-function onDepartmentChange() {
+function setTeamsForDepartment(resetTeam = true) {
   const dept = departmentOptions.value.find(dept => dept.name === state.s1_department)
-
   teamOptions.value = dept?.teams || []
-  state.s1_team = ''
-  resetMemberRows()
+  if (resetTeam) {
+    state.s1_team = ''
+    resetMemberRows()
+  } else if (state.s1_team && !teamOptions.value.some(t => t.name === state.s1_team)) {
+    state.s1_team = ''
+    resetMemberRows()
+  }
+}
+
+function updateGroupTypeFromTeam() {
+  if (!state.s1_team) {
+    state.s1_groupType = ''
+    return
+  }
+  const matched = teamOptions.value.find(team => team.name === state.s1_team)
+  if (!matched) {
+    state.s1_groupType = ''
+    return
+  }
+  if (matched.type_group === 'Pro') state.s1_groupType = 'Production'
+  else if (matched.type_group === 'Non') state.s1_groupType = 'Non Production'
+  else state.s1_groupType = 'Support'
+}
+
+function onDepartmentChange() {
+  setTeamsForDepartment(true)
   fetchPositionAdvisor()
   fetchPositionManager()
 }
@@ -440,12 +475,7 @@ watch(() => state.s1_team, (val, oldVal) => {
     resetMemberRows()
     return
   }
-  const matched = teamOptions.value.find(team => team.name === val)
-  state.s1_groupType =
-    matched?.type_group == 'Pro' ? "Production" :
-      matched?.type_group == 'Non' ? "Non Production" :
-        'Support'
-        || ''
+  updateGroupTypeFromTeam()
   if (oldVal && oldVal !== val) {
     resetMemberRows()
   }
@@ -596,8 +626,8 @@ function setDisabled() { }
 function saveS1() { }
 function goNext() { }
 
-fetchDepartmets()
 hydrateForm()
+fetchDepartmets()
 onMounted(() => {
   ensureGroupNo()
 })
