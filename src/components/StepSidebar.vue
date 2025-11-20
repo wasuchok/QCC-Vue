@@ -135,7 +135,7 @@ function logout() {
 @reference "tailwindcss";
 
 .step-sidebar {
-  @apply w-full max-w-[260px] border-4 border-black rounded-[24px] bg-[#f9fbff] shadow-[4px_4px_0px_rgba(0, 0, 0, 0.25)];
+  @apply w-full max-w-[260px] border-4 border-black rounded-[24px] bg-[#f9fbff] shadow-[4px_4px_0_rgba(0,0,0,0.25)];
 }
 
 .step-sidebar__title {

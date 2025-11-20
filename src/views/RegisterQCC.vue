@@ -29,7 +29,7 @@
         <div class="label col-start-4 justify-self-end max-[1200px]:col-start-1 max-[1200px]:col-span-1">
           ประเภทกลุ่มที่ดำเนินกิจกรรม</div>
         <div class="auto col-start-5 max-[1200px]:col-start-2 max-[1200px]:col-span-1">{{ state.s1_groupType || 'Auto'
-          }}</div>
+        }}</div>
 
         <div class="label">ทีม</div>
         <select v-model="state.s1_team" class="ctrl" :disabled="ui.disabled || !state.s1_department">
@@ -88,8 +88,7 @@
             <div class="label w-full text-center sm:text-left">ผู้จัดการทีม SV,TM</div>
             <div class="advisorRowSingle mt-2">
               <div class="advisorSelect w-full">
-                <select v-model="state.manager.id" class="ctrl h-10" :disabled="ui.disabled || !state.s1_department"
-                  @change="onManagerSelect">
+                <select v-model="state.manager.id" class="ctrl h-10" :disabled="ui.disabled || !state.s1_department">
                   <option value="">{{ state.s1_department ? '— เลือกผู้จัดการ —' : 'เลือกฝ่ายก่อน' }}</option>
                   <option v-for="candidate in managerCandidates" :key="candidate.id" :value="candidate.employee_code">
                     {{ candidate.full_name }} ({{ candidate.position }})
@@ -183,9 +182,9 @@
 <script setup>
 import StepSidebar from '@/components/StepSidebar.vue'
 import { fetchApiPublic } from '@/utils/apiPublic'
-import { onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
 import Swal from 'sweetalert2'
+import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 
 const DEFAULT_MEMBER_ROWS = 4
 const MAX_MEMBERS = 10
@@ -194,6 +193,8 @@ const ROLE_LABELS = ['หัวหน้า', 'รองหัวหน้า', 
 const MAX_ADVISORS = 2
 const MIN_ADVISORS = 1
 const MEMBER_ROLE_DEFAULT = 'สมาชิก'
+const GROUP_NO_BASE = '2619001'
+const STORAGE_KEY = 'qcc.register.form.v1'
 
 function getMemberRole(idx) {
   if (typeof idx !== 'number' || idx < 0) return MEMBER_ROLE_DEFAULT
@@ -231,6 +232,8 @@ const state = reactive({
   s1_desc: '',
   members: buildMemberRows(),
   logoFiles: [],
+  logoDataUrl: '',
+  logoFileName: '',
 })
 
 const ui = reactive({
@@ -248,6 +251,8 @@ const gridCols = 'grid-cols-[220px_260px_minmax(0,1fr)_240px_200px] max-[1200px]
 const twoCols = 'grid-cols-[1fr_360px] max-[1200px]:grid-cols-1'
 const employeeLookupCache = new Map()
 let logoObjectUrl = ''
+let groupNoLocked = false
+let hasHydrated = false
 
 function syncMemberRoles() {
   state.members.forEach((member, idx) => {
@@ -288,10 +293,74 @@ function setLogoPreview(file) {
   }
   if (!file) {
     ui.logoPreviewUrl = ''
+    state.logoDataUrl = ''
+    state.logoFileName = ''
     return
   }
-  logoObjectUrl = URL.createObjectURL(file)
-  ui.logoPreviewUrl = logoObjectUrl
+  if (typeof file === 'string') {
+    ui.logoPreviewUrl = file
+  } else {
+    logoObjectUrl = URL.createObjectURL(file)
+    ui.logoPreviewUrl = logoObjectUrl
+  }
+}
+
+function ensureGroupNo() {
+  if (groupNoLocked || state.s1_groupNo) return
+  state.s1_groupNo = GROUP_NO_BASE
+  groupNoLocked = true
+}
+
+function persistForm() {
+  if (!hasHydrated || typeof window === 'undefined' || !window.localStorage) return
+  const payload = {
+    ...state,
+    advisors: state.advisors.map(a => ({ ...a })),
+    manager: { ...state.manager },
+    members: state.members.map(m => ({ ...m })),
+    logoFiles: [],
+  }
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+  } catch (err) {
+    console.warn('Persist register form failed:', err)
+  }
+}
+
+function hydrateForm() {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    hasHydrated = true
+    return
+  }
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY)
+    if (!saved) return
+    const data = JSON.parse(saved)
+    Object.assign(state, {
+      s1_date: data.s1_date || '',
+      s1_groupNo: data.s1_groupNo || '',
+      s1_department: data.s1_department || '',
+      s1_departmentName: data.s1_departmentName || '',
+      s1_team: data.s1_team || '',
+      s1_teamName: data.s1_teamName || '',
+      s1_groupType: data.s1_groupType || '',
+      s1_groupName: data.s1_groupName || '',
+      s1_motto: data.s1_motto || '',
+      advisors: Array.isArray(data.advisors) ? data.advisors.map((a, idx) => ({ ...a, uid: a.uid || `advisor-${idx}` })) : state.advisors,
+      manager: data.manager ? { ...state.manager, ...data.manager } : state.manager,
+      s1_desc: data.s1_desc || '',
+      members: Array.isArray(data.members) && data.members.length ? data.members.map((m, idx) => ({ ...m, uid: m.uid || `member-${idx}` })) : state.members,
+      logoDataUrl: data.logoDataUrl || '',
+      logoFileName: data.logoFileName || '',
+    })
+    if (state.logoDataUrl) {
+      setLogoPreview(state.logoDataUrl)
+    }
+  } catch (err) {
+    console.warn('Hydrate register form failed:', err)
+  } finally {
+    hasHydrated = true
+  }
 }
 
 async function fetchDepartmets() {
@@ -358,7 +427,6 @@ async function fetchPositionManager() {
 function onDepartmentChange() {
   const dept = departmentOptions.value.find(dept => dept.name === state.s1_department)
 
-  console.log(dept)
   teamOptions.value = dept?.teams || []
   state.s1_team = ''
   resetMemberRows()
@@ -373,8 +441,11 @@ watch(() => state.s1_team, (val, oldVal) => {
     return
   }
   const matched = teamOptions.value.find(team => team.name === val)
-  console.log('matched team:', matched)
-  state.s1_groupType = matched?.type_group || ''
+  state.s1_groupType =
+    matched?.type_group == 'Pro' ? "Production" :
+      matched?.type_group == 'Non' ? "Non Production" :
+        'Support'
+        || ''
   if (oldVal && oldVal !== val) {
     resetMemberRows()
   }
@@ -487,7 +558,6 @@ async function fillMember(idx) {
   }
   member.name = employee.fullName || ''
 }
-function onManagerSelect() { }
 function addMemberRow() {
   if (ui.disabled) return
   if (!state.s1_department || !state.s1_team) {
@@ -512,7 +582,14 @@ function onLogoChange(event) {
     return
   }
   state.logoFiles = [file]
-  setLogoPreview(file)
+  const reader = new FileReader()
+  reader.onload = () => {
+    state.logoDataUrl = reader.result || ''
+    state.logoFileName = file.name || ''
+    setLogoPreview(state.logoDataUrl)
+    persistForm()
+  }
+  reader.readAsDataURL(file)
   if (event?.target) event.target.value = ''
 }
 function setDisabled() { }
@@ -520,6 +597,11 @@ function saveS1() { }
 function goNext() { }
 
 fetchDepartmets()
+hydrateForm()
+onMounted(() => {
+  ensureGroupNo()
+})
+watch(state, persistForm, { deep: true })
 
 onBeforeUnmount(() => {
   if (logoObjectUrl) {
@@ -576,7 +658,7 @@ onBeforeUnmount(() => {
 }
 
 .advisorRowSingle {
-  @apply grid grid-cols-[minmax(0,_1fr)_auto] gap-2.5 items-center max-[900px]:grid-cols-1;
+  @apply grid grid-cols-[minmax(0, _1fr)_auto] gap-2.5 items-center max-[900px]:grid-cols-1;
 }
 
 .advisorSelect {
