@@ -87,8 +87,9 @@
           <div class="empSection">
             <div class="label w-full text-center sm:text-left">ผู้จัดการทีม SV,TM</div>
             <div class="advisorRowSingle mt-2">
-            <div class="advisorSelect w-full">
-                <select v-model="state.manager.id" class="ctrl h-10" :disabled="ui.disabled || !state.s1_department" @change="onManagerSelect">
+              <div class="advisorSelect w-full">
+                <select v-model="state.manager.id" class="ctrl h-10" :disabled="ui.disabled || !state.s1_department"
+                  @change="onManagerSelect">
                   <option value="">{{ state.s1_department ? '— เลือกผู้จัดการ —' : 'เลือกฝ่ายก่อน' }}</option>
                   <option v-for="candidate in managerCandidates" :key="candidate.id" :value="candidate.employee_code">
                     {{ candidate.full_name }} ({{ candidate.position }})
@@ -167,6 +168,9 @@
         <RouterLink to="/">
           <button class="btn bg-yellow-100 hover:bg-yellow-200">ย้อนกลับหน้าหลัก</button>
         </RouterLink>
+        <button class="btn bg-white" @click="setDisabled(false)" :disabled="ui.saving">
+          แก้ไข
+        </button>
         <button class="btn bg-[#eafaf3]" @click="saveS1" :disabled="ui.saving">
           {{ ui.saving ? 'กำลังบันทึก…' : '💾 บันทึก' }}
         </button>
@@ -182,7 +186,7 @@
 import StepSidebar from '@/components/StepSidebar.vue'
 import { fetchApiPublic } from '@/utils/apiPublic'
 import Swal from 'sweetalert2'
-import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 const DEFAULT_MEMBER_ROWS = 4
@@ -306,9 +310,11 @@ function setLogoPreview(file) {
   }
 }
 
-function ensureGroupNo() {
-  if (groupNoLocked || state.s1_groupNo) return
-  state.s1_groupNo = GROUP_NO_BASE
+function ensureGroupNo(prefix) {
+  if (!prefix) return
+  const currentPrefix = (state.s1_groupNo || '').charAt(0)
+  if (groupNoLocked && state.s1_groupNo && currentPrefix === prefix) return
+  state.s1_groupNo = `${prefix}${GROUP_NO_BASE}`
   groupNoLocked = true
 }
 
@@ -461,6 +467,11 @@ function updateGroupTypeFromTeam() {
   if (matched.type_group === 'Pro') state.s1_groupType = 'Production'
   else if (matched.type_group === 'Non') state.s1_groupType = 'Non Production'
   else state.s1_groupType = 'Support'
+
+  if (state.s1_groupType.length > 0) {
+    ensureGroupNo(matched.type_group == "Pro" ? "P" : matched.type_group == "Non" ? "N" : "S")
+  }
+
 }
 
 function onDepartmentChange() {
@@ -634,11 +645,24 @@ function onLogoChange(event) {
   reader.readAsDataURL(file)
   if (event?.target) event.target.value = ''
 }
-function setDisabled() { }
+function setDisabled(v = true) {
+  ui.disabled = v
+}
 
 function saveS1() {
   ui.saveMsg = ''
-  ensureGroupNo()
+  const missing = collectMissingFields()
+  if (missing.length) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'กรอกข้อมูลไม่ครบ',
+      html: `<div class="text-left">โปรดกรอกให้ครบ:</div><ul style="text-align:left; margin:10px 0 0 18px; list-style:disc;">${missing.map(m => `<li>${m}</li>`).join('')}</ul>`,
+      confirmButtonText: 'ตกลง',
+    })
+    return
+  }
+
+
   ui.saving = true
   try {
     persistForm()
@@ -652,15 +676,31 @@ function saveS1() {
   }
 }
 
+function collectMissingFields() {
+  const missing = []
+  if (!state.s1_date) missing.push('วันที่ลงทะเบียน')
+  if (!state.s1_department) missing.push('ฝ่าย / Department')
+  if (!state.s1_team) missing.push('ทีม')
+  if (!state.s1_groupName) missing.push('ชื่อกลุ่ม')
+  if (!state.s1_motto) missing.push('คำขวัญกลุ่ม')
+  if (!state.s1_desc) missing.push('ลักษณะงานประจำกลุ่ม')
+  if (!state.manager.id) missing.push('ผู้จัดการทีม')
+  const advisorIncomplete = state.advisors.some(a => !a.id)
+  if (advisorIncomplete) missing.push('ที่ปรึกษา')
+  const memberFilledCount = state.members.filter(m => m.empId && m.name).length
+  if (memberFilledCount < 2) {
+    missing.push('สมาชิกในกลุ่ม (อย่างน้อย 2 คน และกรอกข้อมูลครบ)')
+  }
+  return missing
+}
+
 function goNext() {
   router.push("/minutes2")
 }
 
 hydrateForm()
 fetchDepartmets()
-onMounted(() => {
-  ensureGroupNo()
-})
+
 
 onBeforeUnmount(() => {
   if (logoObjectUrl) {

@@ -148,6 +148,7 @@
 import StepSidebar from '@/components/StepSidebar.vue'
 import { STEP1_SIDEBAR_SECTIONS } from '@/constants/qccSteps'
 import { useRegisterShared } from '@/stores/registerShared'
+import Swal from 'sweetalert2'
 import { onMounted, reactive, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -315,8 +316,15 @@ function filesToMetas(files = []) {
 /* ---------- Save ---------- */
 async function saveMinutes() {
     ui.saveMsg = ''
-    if (!state.date) {
-        alert('กรุณาเลือก "วันที่ประชุม"')
+
+    const missing = collectMissingFields()
+    if (missing.length) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'กรอกข้อมูลไม่ครบ',
+            html: `<div class="text-left">โปรดกรอกให้ครบ:</div><ul style="text-align:left; margin:10px 0 0 18px; list-style:disc;">${missing.map(m => `<li>${m}</li>`).join('')}</ul>`,
+            confirmButtonText: 'ตกลง',
+        })
         return
     }
 
@@ -352,5 +360,19 @@ async function saveMinutes() {
 /* ---------- ไปหน้าถัดไป ---------- */
 function goNext() {
     router.push('/summary-step1')
+}
+
+function collectMissingFields() {
+    const missing = []
+    if (!state.groupName) missing.push('ชื่อกลุ่ม')
+    if (!state.date) missing.push('วันที่ประชุม')
+    if (!state.place) missing.push('สถานที่')
+    if (!state.start) missing.push('เวลาเริ่มประชุม')
+    if (!state.end) missing.push('เวลาสิ้นสุดประชุม')
+    if (!state.topic) missing.push('หัวข้อการประชุม')
+    if (!state.detail) missing.push('รายละเอียดการประชุม')
+    const attendeeFilled = state.attendees.filter(a => a.empId || a.name).length
+    if (!attendeeFilled) missing.push('ผู้เข้าร่วมประชุม (กรอกอย่างน้อย 1 คน)')
+    return missing
 }
 </script>
