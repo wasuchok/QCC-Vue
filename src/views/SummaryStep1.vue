@@ -6,7 +6,7 @@
     <div class="bg-[#f3fbfb] border-4 border-black rounded-3xl p-5 flex-1 space-y-5">
       <header class="text-center space-y-1">
         <div class="text-[28px] font-extrabold leading-tight">
-          สรุปขั้นตอน <b>STEP 1</b>
+          สรุปขั้นตอน <b>STEP 0</b>
         </div>
         <p class="text-sm text-slate-600">ตรวจสอบความครบถ้วนของกิจกรรมก่อนส่งให้ Admin อนุมัติ</p>
       </header>
@@ -30,20 +30,20 @@
         <div v-if="teamApproved" class="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
           <div>
             <p class="text-xs font-semibold text-slate-500">ชื่อกลุ่ม</p>
-            <p class="font-semibold text-slate-900">{{ sharedRegister.groupName }}</p>
+            <p class="font-semibold text-slate-900">{{ registerData.groupName || '—' }}</p>
           </div>
           <div>
             <p class="text-xs font-semibold text-slate-500">ฝ่าย / หน่วยงาน</p>
-            <p class="font-semibold text-slate-900">{{ sharedRegister.departmentName || sharedRegister.department || '—'
-              }}</p>
+            <p class="font-semibold text-slate-900">{{ registerData.departmentName || registerData.department || '—'
+            }}</p>
           </div>
           <div>
             <p class="text-xs font-semibold text-slate-500">ทีม / สายงาน</p>
-            <p class="font-semibold text-slate-900">{{ sharedRegister.teamName || sharedRegister.team || '—' }}</p>
+            <p class="font-semibold text-slate-900">{{ registerData.teamName || registerData.team || '—' }}</p>
           </div>
           <div>
             <p class="text-xs font-semibold text-slate-500">ผู้จัดการทีม</p>
-            <p class="font-semibold text-slate-900">{{ sharedRegister.manager?.name || '—' }}</p>
+            <p class="font-semibold text-slate-900">{{ registerData.manager?.name || '—' }}</p>
           </div>
         </div>
         <p v-else
@@ -89,13 +89,28 @@
 <script setup>
 import StepSidebar from '@/components/StepSidebar.vue'
 import { STEP1_SIDEBAR_SECTIONS } from '@/constants/qccSteps'
-import { useRegisterShared } from '@/stores/registerShared'
-import { computed } from 'vue'
+import { computed, onMounted, reactive } from 'vue'
 import { RouterLink } from 'vue-router'
 
-const sharedRegister = useRegisterShared()
 const stepSections = STEP1_SIDEBAR_SECTIONS
-const teamApproved = computed(() => Boolean(sharedRegister.approved))
+const REGISTER_KEY = 'qcc.register.form.v1'
+const MINUTES_KEY = 'qcc.minutes2.form.v1'
+
+const registerData = reactive({
+  groupName: '',
+  department: '',
+  departmentName: '',
+  team: '',
+  teamName: '',
+  manager: { name: '' },
+})
+
+const localFlags = reactive({
+  hasRegister: false,
+  hasMinutes: false,
+})
+
+const teamApproved = computed(() => localFlags.hasRegister)
 
 const modules = computed(() => [
   {
@@ -103,20 +118,22 @@ const modules = computed(() => [
     label: 'ข้อมูลกิจกรรม QCC',
     description: 'รายละเอียดทีม ประเภทกลุ่ม และหัวข้อที่จะดำเนินงาน',
     path: '/register-qcc',
-    complete: Boolean(sharedRegister.groupName),
-    status: sharedRegister.groupName ? 'complete' : 'warning',
-    messages: sharedRegister.groupName
-      ? ['ข้อมูลกลุ่มครบแล้ว', 'สามารถอัปเดตเพิ่มเติมได้ทุกเมื่อ']
-      : ['ยังไม่ได้กรอกข้อมูลทีม', 'กรุณาเข้าไปบันทึกก่อนส่งต่อ'],
+    complete: localFlags.hasRegister,
+    status: localFlags.hasRegister ? 'complete' : 'warning',
+    messages: localFlags.hasRegister
+      ? ['ข้อมูลครบถ้วน']
+      : ['ยังไม่ได้กรอกข้อมูลทีม (qcc.register.form.v1)'],
   },
   {
     key: 'minutes2',
     label: 'Minutes #1',
     description: 'บันทึกการประชุมครั้งที่ 1 พร้อมผู้เข้าร่วมและวาระประชุม',
     path: '/minutes2',
-    complete: false,
-    status: 'warning',
-    messages: ['ยังไม่พบการบันทึก', 'อัปเดตหลังประชุมครั้งที่ 1'],
+    complete: localFlags.hasMinutes,
+    status: localFlags.hasMinutes ? 'complete' : 'warning',
+    messages: localFlags.hasMinutes
+      ? ['ข้อมูลครบถ้วน']
+      : ['ยังไม่พบการบันทึก (qcc.minutes2.form.v1)'],
   },
 ])
 
@@ -127,7 +144,30 @@ function statusBadgeClass(module) {
 }
 
 function saveSummary() {
-  // Placeholder action; replace with real save logic when API is ready
   alert('บันทึกสรุป STEP 0/1 (ตัวอย่าง)')
 }
+
+function hydrateFromLocalStorage() {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  try {
+    const regRaw = window.localStorage.getItem(REGISTER_KEY)
+    const minRaw = window.localStorage.getItem(MINUTES_KEY)
+    localFlags.hasRegister = Boolean(regRaw)
+    localFlags.hasMinutes = Boolean(minRaw)
+
+    if (regRaw) {
+      const reg = JSON.parse(regRaw)
+      registerData.groupName = reg.s1_groupName || ''
+      registerData.department = reg.s1_department || ''
+      registerData.departmentName = reg.s1_departmentName || ''
+      registerData.team = reg.s1_team || ''
+      registerData.teamName = reg.s1_teamName || ''
+      registerData.manager.name = reg.manager?.name || ''
+    }
+  } catch (err) {
+    console.warn('Hydrate summary failed:', err)
+  }
+}
+
+onMounted(hydrateFromLocalStorage)
 </script>

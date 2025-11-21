@@ -158,7 +158,7 @@ const REGISTER_FORM_KEY = 'qcc.register.form.v1'
 const MINUTES2_STORAGE_KEY = 'qcc.minutes2.form.v1'
 
 function prevRouter() {
-    router.go(-1)
+    router.push('/register-qcc')
 }
 
 /* ---------- State ---------- */
@@ -214,6 +214,26 @@ function hydrateFromRegisterForm() {
         const data = JSON.parse(saved)
         if (data?.s1_groupName && !state.groupName) {
             state.groupName = data.s1_groupName
+        }
+        // Prefill attendees from the registration form so employee IDs show up automatically
+        if (!state.attendees.length && Array.isArray(data?.members) && data.members.length) {
+            const deptLabel =
+                data.s1_departmentName ||
+                data.s1_department ||
+                data.s1_teamName ||
+                data.s1_team ||
+                ''
+            const revived = data.members
+                .map((m, idx) => ({
+                    uid: m.uid || cryptoRandom() || `reg-att-${idx}`,
+                    empId: m.empId || '',
+                    name: m.name || '',
+                    dept: m.dept || deptLabel || m.position || '',
+                }))
+                .filter(a => a.empId || a.name)
+            if (revived.length) {
+                state.attendees.splice(0, state.attendees.length, ...revived)
+            }
         }
     } catch (err) {
         console.warn('Hydrate minutes2 from register form failed:', err)

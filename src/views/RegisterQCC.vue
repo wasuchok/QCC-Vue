@@ -87,8 +87,8 @@
           <div class="empSection">
             <div class="label w-full text-center sm:text-left">ผู้จัดการทีม SV,TM</div>
             <div class="advisorRowSingle mt-2">
-              <div class="advisorSelect w-full">
-                <select v-model="state.manager.id" class="ctrl h-10" :disabled="ui.disabled || !state.s1_department">
+            <div class="advisorSelect w-full">
+                <select v-model="state.manager.id" class="ctrl h-10" :disabled="ui.disabled || !state.s1_department" @change="onManagerSelect">
                   <option value="">{{ state.s1_department ? '— เลือกผู้จัดการ —' : 'เลือกฝ่ายก่อน' }}</option>
                   <option v-for="candidate in managerCandidates" :key="candidate.id" :value="candidate.employee_code">
                     {{ candidate.full_name }} ({{ candidate.position }})
@@ -167,7 +167,6 @@
         <RouterLink to="/">
           <button class="btn bg-yellow-100 hover:bg-yellow-200">ย้อนกลับหน้าหลัก</button>
         </RouterLink>
-        <button class="btn bg-white" @click="setDisabled(false)">แก้ไข</button>
         <button class="btn bg-[#eafaf3]" @click="saveS1" :disabled="ui.saving">
           {{ ui.saving ? 'กำลังบันทึก…' : '💾 บันทึก' }}
         </button>
@@ -535,6 +534,7 @@ function removeAdvisor(idx) {
   if (state.advisors.length <= MIN_ADVISORS) return
   state.advisors.splice(idx, 1)
 }
+
 function onAdvisorSelect(idx) {
   const advisor = state.advisors[idx]
   if (!advisor) return
@@ -560,6 +560,18 @@ function onAdvisorSelect(idx) {
 function isAdvisorTaken(code, idx) {
   if (!code) return false
   return state.advisors.some((advisor, advisorIdx) => advisorIdx !== idx && advisor.id === code)
+}
+
+function onManagerSelect() {
+  const selectedId = state.manager.id
+  if (!selectedId) {
+    state.manager.name = ''
+    state.manager.dept = ''
+    return
+  }
+  const candidate = managerCandidates.value.find(person => person.employee_code === selectedId)
+  state.manager.name = candidate?.full_name || candidate?.name || ''
+  state.manager.dept = candidate?.department || candidate?.dept || state.s1_department || ''
 }
 async function fillMember(idx) {
   const member = state.members[idx]
