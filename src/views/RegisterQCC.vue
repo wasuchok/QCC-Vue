@@ -29,7 +29,7 @@
         <div class="label col-start-4 justify-self-end max-[1200px]:col-start-1 max-[1200px]:col-span-1">
           ประเภทกลุ่มที่ดำเนินกิจกรรม</div>
         <div class="auto col-start-5 max-[1200px]:col-start-2 max-[1200px]:col-span-1">{{ state.s1_groupType || 'Auto'
-        }}</div>
+          }}</div>
 
         <div class="label">ทีม</div>
         <select v-model="state.s1_team" class="ctrl" :disabled="ui.disabled || !state.s1_department">
@@ -184,7 +184,7 @@ import StepSidebar from '@/components/StepSidebar.vue'
 import { fetchApiPublic } from '@/utils/apiPublic'
 import Swal from 'sweetalert2'
 import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 
 const DEFAULT_MEMBER_ROWS = 4
 const MAX_MEMBERS = 10
@@ -195,6 +195,7 @@ const MIN_ADVISORS = 1
 const MEMBER_ROLE_DEFAULT = 'สมาชิก'
 const GROUP_NO_BASE = '2619001'
 const STORAGE_KEY = 'qcc.register.form.v1'
+const router = useRouter()
 
 function getMemberRole(idx) {
   if (typeof idx !== 'number' || idx < 0) return MEMBER_ROLE_DEFAULT
@@ -617,21 +618,37 @@ function onLogoChange(event) {
     state.logoDataUrl = reader.result || ''
     state.logoFileName = file.name || ''
     setLogoPreview(state.logoDataUrl)
-    persistForm()
   }
   reader.readAsDataURL(file)
   if (event?.target) event.target.value = ''
 }
 function setDisabled() { }
-function saveS1() { }
-function goNext() { }
+
+function saveS1() {
+  ui.saveMsg = ''
+  ensureGroupNo()
+  ui.saving = true
+  try {
+    persistForm()
+    ui.saveMsg = 'บันทึกชัดเจนแล้ว (บันทึกในเครื่อง)'
+    ui.disabled = true
+  } catch (err) {
+    console.error('saveS1 failed:', err)
+    ui.saveMsg = 'เกิดข้อผิดพลาดในการบันทึก'
+  } finally {
+    ui.saving = false
+  }
+}
+
+function goNext() {
+  router.push("/minutes2")
+}
 
 hydrateForm()
 fetchDepartmets()
 onMounted(() => {
   ensureGroupNo()
 })
-watch(state, persistForm, { deep: true })
 
 onBeforeUnmount(() => {
   if (logoObjectUrl) {
@@ -688,7 +705,7 @@ onBeforeUnmount(() => {
 }
 
 .advisorRowSingle {
-  @apply grid grid-cols-[minmax(0, _1fr)_auto] gap-2.5 items-center max-[900px]:grid-cols-1;
+  @apply grid grid-cols-[1fr_auto] gap-2.5 items-center max-[900px]:grid-cols-1;
 }
 
 .advisorSelect {

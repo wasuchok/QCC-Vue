@@ -99,10 +99,10 @@ const teamApproved = computed(() => Boolean(sharedRegister.approved))
 
 const modules = computed(() => [
   {
-    key: 'activity',
+    key: 'register-qcc',
     label: 'ข้อมูลกิจกรรม QCC',
     description: 'รายละเอียดทีม ประเภทกลุ่ม และหัวข้อที่จะดำเนินงาน',
-    path: '/activity-qcc',
+    path: '/register-qcc',
     complete: Boolean(sharedRegister.groupName),
     status: sharedRegister.groupName ? 'complete' : 'warning',
     messages: sharedRegister.groupName
@@ -110,10 +110,10 @@ const modules = computed(() => [
       : ['ยังไม่ได้กรอกข้อมูลทีม', 'กรุณาเข้าไปบันทึกก่อนส่งต่อ'],
   },
   {
-    key: 'minutes1',
+    key: 'minutes2',
     label: 'Minutes #1',
     description: 'บันทึกการประชุมครั้งที่ 1 พร้อมผู้เข้าร่วมและวาระประชุม',
-    path: '/minutes1',
+    path: '/minutes2',
     complete: false,
     status: 'warning',
     messages: ['ยังไม่พบการบันทึก', 'อัปเดตหลังประชุมครั้งที่ 1'],
